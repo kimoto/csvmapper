@@ -1,0 +1,12 @@
+0.03
+  - Added CSVMapper#each method
+  - Added CSVMapper#before_filter method
+  - Included Enumerable mix-in module
+  - CSVMapper#load_file acceptable URI
+
+0.02
+  - fixed bug
+
+0.01
+  - First Release
+

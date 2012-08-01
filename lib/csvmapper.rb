@@ -1,5 +1,4 @@
 require "csvmapper/version"
-
 require 'csv'
 require 'hashie'
 require 'json'
@@ -7,6 +6,7 @@ require 'pathname'
 require 'time'
 require 'ipaddr'
 require 'uri'
+require 'open-uri'
 
 class CSVMapper
   @@data = []
@@ -14,6 +14,7 @@ class CSVMapper
   @@on_error_go_to_next_line = false
   @@has_header = nil
   @@delimiter = ','
+  @@before_filters = []
 
   def self.column(field, *args, &block)
     value = args.shift
@@ -30,8 +31,10 @@ class CSVMapper
     @@has_header = at
   end
 
-  def self.load_file(path)
-    self.load(File.read(path))
+  def self.load_file(path, encoding = nil)
+    data = open(path).read
+    data.force_encoding(encoding) if encoding
+    self.load(data)
   end
 
   def self.load(data)
@@ -50,6 +53,13 @@ class CSVMapper
         }
         next
       end
+
+      line = line.map{ |item|
+        @@before_filters.each{ |filter|
+          item = filter.call(item)
+        }
+        item
+      }
 
       hash = {}
       @@data.each{ |opt|
@@ -131,6 +141,10 @@ class CSVMapper
     @@delimiter = val
   end
 
+  def self.before_filter(&block)
+    @@before_filters << block
+  end
+
   def initialize(records=[])
     @records = records.map{ |hash|
       Hashie::Mash.new(hash)
@@ -143,6 +157,13 @@ class CSVMapper
 
   def [](index)
     row(index)
+  end
+
+  include Enumerable
+  def each(&block)
+    @records.each{ |record|
+      block.call(record)
+    }
   end
 
   def to_hash
