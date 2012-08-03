@@ -9,7 +9,7 @@ require 'uri'
 require 'open-uri'
 
 class CSVMapper
-  @@data = []
+  @@schema = []
   @@ignore_header_line = false
   @@on_error_go_to_next_line = false
   @@has_header = nil
@@ -18,13 +18,18 @@ class CSVMapper
 
   def self.column(field, *args, &block)
     value = args.shift
-    #value = block.call(value) if block_given?
     record = {
       field => value,
       :options => args,
       :filter => block
     }
-    @@data << record
+    @@schema << record
+  end
+
+  def self.columns(*fields)
+    fields.each_with_index{ |field, index|
+      self.column(field, index, :string)
+    }
   end
 
   def self.has_header(at=0)
@@ -47,6 +52,10 @@ class CSVMapper
 
     records = []
     buf.each_with_index{ |line, index|
+      if line.empty?
+        next
+      end
+
       if @@has_header == index
         line.each_with_index{ |name, i|
           self.column(name.gsub(" ", "_").downcase, i, :string)
@@ -62,7 +71,7 @@ class CSVMapper
       }
 
       hash = {}
-      @@data.each{ |opt|
+      @@schema.each{ |opt|
         key = opt.keys.first
         options = opt[:options]
 
@@ -155,15 +164,54 @@ class CSVMapper
     @records[index]
   end
 
+  ## size
+  def rows
+    @records.size
+  end
+
+  def cols
+    if @records.nil? or @records.empty?
+      return 0
+    else
+      return @records.first.size
+    end
+  end
+
   def [](index)
     row(index)
   end
 
   include Enumerable
   def each(&block)
-    @records.each{ |record|
-      block.call(record)
+    matched = []
+    if @where
+      @records.each{ |record|
+        @where.each{ |key, value|
+          if record.send(key) == value
+            matched << record
+          end
+        }
+      }
+    else
+      matched = @records
+    end
+
+    matched.each{ |e|
+      block.call(e)
     }
+  end
+
+  ## arel style finder
+  def where(options={})
+    @where = Hashie::Clash.new(options) if @where.nil?
+    @where.merge! options
+    self
+  end
+
+  def order(options={})
+    @order = Hashie::Clash.new(options) if @order.nil?
+    @order.merge! options
+    self
   end
 
   def to_hash
@@ -174,6 +222,16 @@ class CSVMapper
 
   def to_json
     @records.to_json
+  end
+
+  def grouped_by(field)
+    hash = {}
+    each{|e|
+      k = e[field]
+      hash[k] ||= []
+      hash[k] << e
+    }
+    hash
   end
 end
 

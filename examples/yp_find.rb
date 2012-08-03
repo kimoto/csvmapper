@@ -1,6 +1,7 @@
 # encoding: utf-8
 require 'csvmapper'
 require 'cgi'
+require 'hashie'
 
 class YPIndex < CSVMapper
   before_filter do |v|
@@ -29,10 +30,6 @@ class YPIndex < CSVMapper
   column :nullfield, 18
 end
 
-csv = YPIndex.load_file("http://temp.orz.hm/yp/index.txt")
-p csv.sort_by{ |e|
-  -e.active_viewers
-}
+p YPIndex.load_file("http://temp.orz.hm/yp/index.txt").where(:name => 'あくえり').where(:genre => 'DQ3 SFC').first
 
-puts csv.to_s
 
